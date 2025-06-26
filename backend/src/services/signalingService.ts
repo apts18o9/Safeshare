@@ -213,3 +213,4 @@ const initSignalingService = (io: IoInstance) => {
     })
 }
 
+export default initSignalingService;
