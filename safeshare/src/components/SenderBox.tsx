@@ -3,8 +3,12 @@
 
 import React, { useState, useCallback } from 'react';
 
-export default function SenderBox(){
-    
+
+
+
+
+export default function SenderBox() {
+
 
     return (
         <div className="bg-[#52525c] rounded-xl shadow-xl border border-teal-700 flex flex-col w-80 h-56 p-4">
