@@ -3,7 +3,8 @@ import http from 'http'
 import cors from 'cors'
 import dotenv from 'dotenv'
 import { Server as SocketIOServer} from 'socket.io'
-
+import initCleanupService from './services/cleanupService'
+import initSignalingService from './services/signalingService'
 import connectDB from './config/db'
 dotenv.config()
 
@@ -16,7 +17,7 @@ const server = http.createServer(app) //creating a http server from express app
 const FRONTEND_URL = process.env.FRONTEND_URL 
 const io = new SocketIOServer(server, {
     cors: {
-        origin: FRONTEND_URL,
+        origin: FRONTEND_URL || 'http://localhost:3000',
         methods: ["POST", "GET"],
         credentials: true
     }
@@ -24,10 +25,12 @@ const io = new SocketIOServer(server, {
 
 app.use(express.json())
 app.use(cors({
-    origin: FRONTEND_URL,
+    origin: FRONTEND_URL || 'http://localhost:3000',
     credentials: true
 }))
 
+initSignalingService(io)
+initCleanupService()
 //routes
 
 app.get('/', (req,res) => {
