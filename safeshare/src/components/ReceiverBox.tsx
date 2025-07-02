@@ -2,70 +2,35 @@
 import { clear } from "console";
 import { useState, useCallback } from "react"
 
+interface FileMetadata {
+    name: string,
+    type: string,
+    size: number
+}
+
 
 interface ReceiverBoxProps {
     connectionStatus: string,
-    setConnectionStatus: (status: string) => void,
-    setTansferProgres: (progress: number) => void,
-    showInfoMessage: (message: string) => void,
-    resetAllUIState: () => void;
+    enteredCode: string,
+    setEnteredCode: (code: string) => void,
+    receivedFileMetadata: FileMetadata | null,
+    onStartReceiving: (message: string) => void
 }
 
 
 
 export default function ReceiverBox({
     connectionStatus,
-    setConnectionStatus,
-    setTansferProgres,
-    showInfoMessage,
-    resetAllUIState,
+    enteredCode,
+    setEnteredCode,
+    receivedFileMetadata,
+    onStartReceiving,
 }: ReceiverBoxProps) {
-    const [incomingFileName, setIncomingFileName] = useState<string | null>(null);
-    const [incomingFileSize, setIncomingFileSize] = useState<string | null>(null);
-    const [enteredCodeDisplay, setEntertedCodeDisplay] = useState<string>('');
 
-    //receiver UI part
+
     const handleCodeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        setEntertedCodeDisplay(event.target.value.toUpperCase());
-        setIncomingFileName(null)
-        setIncomingFileSize(null)
-        setConnectionStatus('Ready to receive')
-        setTansferProgres(0);
-    }
-
-    const startReceivingUI = useCallback(() => {
-        if (!enteredCodeDisplay) {
-            showInfoMessage('Please enter the code to start receiving.');
-            return;
-        }
-
-        setConnectionStatus('Connecting..')
-        setTansferProgres(0);
-
-        setTimeout(() => {
-            setIncomingFileName('text.pdf')
-            setIncomingFileName('10.5mb')
-            showInfoMessage(`Found file details for code: ${enteredCodeDisplay}`)
-            setConnectionStatus('Receiving.')
-
-            let progress = 0;
-            const interval = setInterval(() => {
-                progress += 15
-                if (progress <= 100) {
-                    setTansferProgres(progress)
-                    if (progress === 100) {
-                        clearInterval(interval)
-                        setConnectionStatus('Download Complete')
-                        showInfoMessage('File Download')
-                        setEntertedCodeDisplay('')
-                        setIncomingFileName(null)
-                        setIncomingFileSize(null)
-                    }
-                }
-            }, 200)
-        }, 1500)
-
-    }, [enteredCodeDisplay, setConnectionStatus, setTansferProgres, showInfoMessage])
+        setEnteredCode(event.target.value.toUpperCase()); 
+    };
 
 
 
@@ -76,21 +41,22 @@ export default function ReceiverBox({
                 <input
                     type="text"
                     placeholder="Enter Code"
-                    value={enteredCodeDisplay}
+                    value={enteredCode}
                     onChange={handleCodeChange}
                     className="w-full p-2 text-center text-base font-bold bg-[#171717] border rounded mb-4 text-white placeholder-white "
                 />
-                {incomingFileName && (
+                {receivedFileMetadata && (
                     <div className="mb-2 w-full text-left">
                         <p className="text-sm text-gray-300">Incoming File Details:</p>
-                        <p className="text-base font-semibold text-blue-300">Name: {incomingFileName}</p>
-                        <p className="text-base text-blue-300">: {incomingFileSize}</p>
+                        <p className="text-base font-semibold text-blue-300">Name: {receivedFileMetadata.name}</p>
+                        <p className="text-base text-blue-400">Size: {(receivedFileMetadata.size / (1024 * 1024)).toFixed(2)} MB</p>
                     </div>
                 )}
                 <button type="button"
-                    onClick={startReceivingUI}
+                    onClick={()=> onStartReceiving(enteredCode)}
+                    disabled={!enteredCode || connectionStatus.includes('Connecting') || connectionStatus.includes('Waiting')}
                     className="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700">
-                    Download File
+                    Connect and download file
                 </button>
             </div>
         </div>

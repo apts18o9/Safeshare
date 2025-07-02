@@ -1,4 +1,3 @@
-//displays the progress bar and current connection status(connecting, pending, done)
 
 'use client'
 import React from "react"
