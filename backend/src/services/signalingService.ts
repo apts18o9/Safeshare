@@ -157,7 +157,7 @@ const initSignalingService = (io: IoInstance) => {
           console.log(`[Backend Socket: join-transfer] Transfer found and updated for code: ${data.shareCode}`);
           callback({ success: true, transfer: {
             shareCode: transfer.shareCode,
-            offer: transfer.offer ? JSON.parse(transfer.offer) : null, // Parse offer if it exists
+            offer: transfer.offer ,
             fileMetadata: transfer.fileMetadata,
             senderCandidates: transfer.senderCandidates,
             receiverCandidates: transfer.receiverCandidates // Send existing candidates to new receiver

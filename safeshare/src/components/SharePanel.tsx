@@ -7,7 +7,6 @@ import { io, Socket } from 'socket.io-client'; // Import Socket.IO client librar
 // Import the components using relative paths from the SAME directory
 import ReceiverBox from "./ReceiverBox";
 import SenderBox from "./SenderBox";
-// CustomModal import removed
 import StatusDisplay from "./StatusDisplay";
 
 // Define the FileMetadata interface (can be moved to a shared types file if project grows)
@@ -182,7 +181,7 @@ export default function SharePanel() {
                 try {
                     const signal = JSON.parse(event.data);
                     if (signal.type === 'file-metadata') {
-                        console.log('[DataChannel] Received file metadata:', signal);
+                        console.log('[DataChannel] Receiver: Received file metadata:', signal);
                         // Received file metadata from sender
                         setReceivedFileMetadata({
                             name: signal.fileName,
@@ -195,24 +194,31 @@ export default function SharePanel() {
                         setTransferProgress(0);
                         showInfoMessage(`Receiving file: ${signal.fileName} (${(signal.fileSize / (1024 * 1024)).toFixed(2)} MB)...`);
                     } else if (signal.type === 'file-end') {
-                        // Received signal that all file chunks have been sent
-                        console.log('[DataChannel] File transfer complete!');
+                        console.log('[DataChannel] Receiver: Received file-end signal. Transfer complete!');
                         setConnectionStatus('Download complete');
                         showInfoMessage('File transfer complete! Your download should start automatically.');
 
                         // Reassemble chunks into a Blob and trigger download
+                        console.log('[DataChannel] Receiver: Attempting to create Blob from received chunks...');
                         const blob = new Blob(receivedChunks, { type: receivedFileMetadata?.type || 'application/octet-stream' });
+                        console.log('[DataChannel] Receiver: Blob created:', blob);
+
                         const url = URL.createObjectURL(blob); // Create a temporary URL for the Blob
+                        console.log('[DataChannel] Receiver: Object URL created:', url);
+
                         const a = document.createElement('a'); // Create a temporary anchor element
                         a.href = url;
                         a.download = receivedFileMetadata?.name || 'downloaded_file'; // Set download filename
                         document.body.appendChild(a); // Append to body (required for Firefox)
+                        console.log('[DataChannel] Receiver: Triggering download...');
                         a.click(); // Programmatically click to trigger download
                         document.body.removeChild(a); // Clean up the anchor element
                         URL.revokeObjectURL(url); // Release the object URL to free memory
+                        console.log('[DataChannel] Receiver: Download triggered and URL revoked.');
 
                         // Signal backend that transfer is completed (optional, for cleanup)
                         socketRef.current?.emit('transfer-completed', { shareCode: code });
+                        console.log('[DataChannel] Receiver: Emitted transfer-completed to backend.');
 
                         // Reset receiver states after successful download
                         setReceivedFileMetadata(null);
@@ -220,9 +226,9 @@ export default function SharePanel() {
                         setCurrentReceivedBytes(0);
                     }
                 } catch (e) {
-                    console.error('[DataChannel] Error parsing signaling message:', e);
+                    console.error('[DataChannel] Receiver: Error parsing signaling message:', e);
                     // Treat as a regular text message if not a valid JSON signal
-                    console.log('[DataChannel] Received unknown text message:', event.data);
+                    console.log('[DataChannel] Receiver: Received unknown text message:', event.data);
                 }
             } else if (event.data instanceof ArrayBuffer) {
                 // It's a file chunk (binary data)
@@ -234,6 +240,7 @@ export default function SharePanel() {
                     if (receivedFileMetadata && receivedFileMetadata.size > 0) {
                         setTransferProgress((newBytes / receivedFileMetadata.size) * 100);
                     }
+                    // console.log(`[DataChannel] Receiver: Received chunk, current bytes: ${newBytes}, progress: ${transferProgress.toFixed(2)}%`); // Very verbose
                     return newBytes;
                 });
             }
@@ -297,7 +304,7 @@ export default function SharePanel() {
         const generatedCode = response.shareCode;
         setShareCode(generatedCode); // Store the generated share code
         setConnectionStatus('Waiting for recipient to connect...');
-        showInfoMessage(`Share code generated: ${generatedCode}. Share this with the recipient.`); // Re-added this as a console log
+        showInfoMessage(`Share code generated: ${generatedCode}. Share this with the recipient.`); // Log share code
 
         console.log('[Sender] Creating WebRTC peer connection...');
         await createPeerConnection(true, generatedCode); // Initialize WebRTC peer connection as sender
@@ -319,6 +326,7 @@ export default function SharePanel() {
         socketRef.current?.on('answer-received', async (data: { shareCode: string; answer: any }) => {
           console.log('[Sender] Answer received from backend:', data);
           if (data.shareCode === generatedCode && peerConnectionRef.current && !peerConnectionRef.current.currentRemoteDescription) {
+            
             const answer = new RTCSessionDescription(data.answer);
             await peerConnectionRef.current.setRemoteDescription(answer);
             setConnectionStatus('Recipient connected. Transferring...');
@@ -443,7 +451,8 @@ export default function SharePanel() {
         setConnectionStatus('Offer received. Connecting to sender...');
         await createPeerConnection(false, code); // Initialize WebRTC peer connection as receiver
 
-        const offer = new RTCSessionDescription(data.offer);
+        // FIX: Remove JSON.parse here, as Socket.IO already deserializes it
+        const offer = new RTCSessionDescription(data.offer); // <-- CHANGE HERE
         await peerConnectionRef.current.setRemoteDescription(offer);
         console.log('[Receiver] Set remote description (offer).');
 
@@ -490,6 +499,7 @@ export default function SharePanel() {
                 setConnectionStatus('Offer retrieved. Connecting to sender...');
                 await createPeerConnection(false, code); // Initialize WebRTC peer connection as receiver
 
+                // This JSON.parse is CORRECT because the offer comes from the DB as a string
                 const offer = new RTCSessionDescription(JSON.parse(response.transfer.offer));
                 await peerConnectionRef.current.setRemoteDescription(offer);
                 console.log('[Receiver] Retrieved and set remote description (offer) from DB.');
