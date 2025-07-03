@@ -3,7 +3,6 @@
 
 import React, { useState, useCallback } from 'react';
 
-// Define the FileMetadata interface (can be moved to a shared types file if project grows)
 interface FileMetadata {
   name: string;
   size: number;
@@ -19,17 +18,14 @@ interface SenderBoxProps {
   
 }
 
-/**
- * Component for the file sending interface, now integrated with real file data
- * and callbacks for actual WebRTC signaling initiation.
- */
+
 export default function SenderBox({
   connectionStatus,
-  fileToShare, // This prop now holds the actual selected file
-  setFileToShare, // This prop is used to update the parent's state
+  fileToShare, 
+  setFileToShare, 
   shareCode,
   onStartSharing,
-   // Still used for other notifications like "copied to clipboard"
+ 
 }: SenderBoxProps) {
 
   // Handles file selection from the input element

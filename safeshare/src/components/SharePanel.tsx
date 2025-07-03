@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { io, Socket } from 'socket.io-client'; // Import Socket.IO client library
 
-// Import the components using relative paths from the SAME directory
+
 import ReceiverBox from "./ReceiverBox";
 import SenderBox from "./SenderBox";
 import StatusDisplay from "./StatusDisplay";
@@ -25,13 +25,10 @@ const ICE_SERVERS = {
   ],
 };
 
-// --- File Transfer Chunk Size ---
+
 const CHUNK_SIZE = 64 * 1024; // 64 Kilobytes
 
-// Backend URL where your Node.js server is running
-// IMPORTANT: Make sure this matches your backend server's port (e.g., 5000)
-// If deployed, this should be the deployed backend URL.
-// This uses process.env.NEXT_PUBLIC_BACKEND_URL from your .env.local file
+
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
 
 
@@ -50,7 +47,7 @@ export default function SharePanel() {
   // Function to display messages (now logs to console instead of showing modal)
   const showInfoMessage = useCallback((msg: string) => {
     console.log(`P2P Info: ${msg}`);
-    // If you want a non-blocking UI notification (like a toast), you'd implement it here.
+    
   }, []);
 
   // --- Sender Specific States ---
@@ -97,8 +94,7 @@ export default function SharePanel() {
   }, [showInfoMessage]);
 
 
-  // --- WebRTC Core Setup Logic (Common to both Sender and Receiver) ---
-  // This function sets up the RTCPeerConnection and its common handlers.
+
   const createPeerConnection = useCallback((isSender: boolean, currentShareCode: string) => {
     // Ensure previous connections are closed before creating new ones
     if (peerConnectionRef.current) {
@@ -113,7 +109,7 @@ export default function SharePanel() {
     setTransferProgress(0); // Reset progress for new connection
 
     // --- ICE Candidate Handling ---
-    // When the browser finds an ICE candidate (network path), send it to the other peer via the signaling server.
+   
     peerConnectionRef.current.onicecandidate = (event) => {
       if (event.candidate) {
         // Emit ICE candidate to the signaling server via Socket.IO
@@ -127,7 +123,7 @@ export default function SharePanel() {
     };
 
     // --- Peer Connection State Change ---
-    // Monitor the overall state of the WebRTC peer connection.
+   
     peerConnectionRef.current.onconnectionstatechange = () => {
       const state = peerConnectionRef.current?.connectionState || 'Unknown';
       setConnectionStatus(state);
@@ -380,17 +376,16 @@ export default function SharePanel() {
     fileReaderRef.current = new FileReader(); // Create a new FileReader instance for each transfer
 
     fileReaderRef.current.onload = (e) => {
-      const chunk = e.target?.result as ArrayBuffer; // Get the ArrayBuffer chunk
+      const chunk = e.target?.result as ArrayBuffer; 
       if (chunk) {
-        dataChannelRef.current?.send(chunk); // Send the chunk over the DataChannel
-        offset += chunk.byteLength; // Update the offset
+        dataChannelRef.current?.send(chunk); 
+        offset += chunk.byteLength; 
         setTransferProgress((offset / file.size) * 100); // Update transfer progress
-        // console.log(`[Sender] Sent chunk: ${offset}/${file.size} bytes`); // Too verbose, uncomment for deep debug
-
+       
         if (offset < file.size) {
           readNextChunk(); // Read the next chunk if not all sent
         } else {
-          // All chunks sent, send a final 'file-end' signal
+        
           dataChannelRef.current?.send(JSON.stringify({ type: 'file-end' }));
           setConnectionStatus('File sent successfully!');
           showInfoMessage('File sent successfully!');
@@ -543,16 +538,16 @@ export default function SharePanel() {
 
   return (
     <div className="flex flex-col items-center justify-center gap-8 w-full">
-      {/* Custom Modal is removed, so no rendering here */}
+   
 
-      {/* Connection Status and Progress Bar (Common for both) */}
+   
       <div className="w-full max-w-lg mx-auto">
         <StatusDisplay connectionStatus={connectionStatus} transferProgress={transferProgress} />
       </div>
 
-      {/* Sender and Receiver Boxes (Side-by-Side on larger screens, stacked on small) */}
+   
       <div className="flex flex-col md:flex-row justify-center items-stretch gap-8 w-full max-w-5xl px-4">
-        {/* Sender Box */}
+    
         <SenderBox
           connectionStatus={connectionStatus}
           fileToShare={fileToShare}
@@ -562,7 +557,7 @@ export default function SharePanel() {
           // showInfoMessage prop is no longer passed
         />
 
-        {/* Receiver Box */}
+      
         <ReceiverBox
           connectionStatus={connectionStatus}
           enteredCode={enteredCode}
@@ -573,7 +568,7 @@ export default function SharePanel() {
         />
       </div>
 
-      {/* A common reset button */}
+    
       <button
         onClick={resetAllUIState}
         className="mt-8 px-8 py-3 rounded-full text-lg font-semibold bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-white transition-all duration-300 transform hover:scale-105 active:scale-95"

@@ -3,7 +3,7 @@
 
 import React, { useState, useCallback } from 'react';
 
-// Define the FileMetadata interface (can be moved to a shared types file if project grows)
+// Define the FileMetadata interface
 interface FileMetadata {
   name: string;
   size: number;
@@ -15,13 +15,9 @@ interface ReceiverBoxProps {
   enteredCode: string; // Real entered code from parent
   setEnteredCode: (code: string) => void; // Callback to update entered code in parent
   receivedFileMetadata: FileMetadata | null; // Real metadata received from parent
-  onStartReceiving: (code: string) => void; // Callback to initiate real receiving
+  onStartReceiving: (code: string) => void; 
 }
 
-/**
- * Component for the file receiving interface, now integrated with real file data
- * and callbacks for actual WebRTC signaling initiation.
- */
 export default function ReceiverBox({
   connectionStatus,
   enteredCode,
