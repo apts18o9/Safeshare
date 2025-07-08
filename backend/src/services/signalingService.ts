@@ -27,7 +27,6 @@ const initSignalingService = (io: IoInstance) => {
       console.log(`[Backend Socket: create-transfer] Event received from ${socket.id}`);
       console.log(`[Backend Socket: create-transfer] Data received:`, data);
 
-      // FIX: Changed nanoid(8) to nanoid(6) for a 6-digit code
       let shareCode = nanoid(6).toUpperCase(); // Generate a 6-character unique code
       let isUnique = false;
       let attempts = 0;
@@ -36,24 +35,29 @@ const initSignalingService = (io: IoInstance) => {
       // Loop to ensure unique share code
       while (!isUnique && attempts < MAX_ATTEMPTS) {
         console.log(`[Backend Socket: create-transfer] Attempting to generate unique code (Attempt ${attempts + 1})...`);
-        const existingTransfer = await Transfer.findOne({ shareCode });
-        if (!existingTransfer) {
-          isUnique = true;
-          console.log(`[Backend Socket: create-transfer] Unique share code generated: ${shareCode}`);
-        } else {
-          shareCode = nanoid(6).toUpperCase(); // Regenerate if not unique
-          attempts++;
+        try {
+          const existingTransfer = await Transfer.findOne({ shareCode });
+          if (!existingTransfer) {
+            isUnique = true;
+            console.log(`[Backend Socket: create-transfer] Unique share code generated: ${shareCode}`);
+          } else {
+            shareCode = nanoid(6).toUpperCase(); // Regenerate if not unique
+            attempts++;
+          }
+        } catch (dbError: any) {
+          console.error(`[Backend Socket: create-transfer] Database error during unique code check: ${dbError.message}`);
+          console.error(dbError);
+          return callback({ success: false, message: `Database error during code generation: ${dbError.message}` });
         }
       }
 
       if (!isUnique) {
         console.error(`[Backend Socket: create-transfer] Failed to generate unique share code after ${MAX_ATTEMPTS} attempts.`);
-        return callback({ success: false, message: 'Failed to generate unique share code.' });
+        return callback({ success: false, message: 'Failed to generate unique share code after multiple attempts.' });
       }
 
       try {
         console.log(`[Backend Socket: create-transfer] Creating new Transfer document...`);
-        // Create a new transfer document in MongoDB
         const newTransfer = new Transfer({
           shareCode,
           senderId: data.senderId,
@@ -61,17 +65,15 @@ const initSignalingService = (io: IoInstance) => {
           status: 'pending',
         });
         console.log(`[Backend Socket: create-transfer] Saving new Transfer document to MongoDB...`);
-        await newTransfer.save(); // Save the new transfer
+        await newTransfer.save();
         console.log(`[Backend Socket: create-transfer] Transfer saved successfully!`);
 
         console.log(`[Backend Socket: create-transfer] Transfer created with code: ${shareCode} by sender ${data.senderId}`);
-        // Send success response back to the sender
         callback({ success: true, shareCode });
         console.log(`[Backend Socket: create-transfer] Callback sent to frontend with success.`);
       } catch (error: any) {
-        // Log any errors during connection and exit the process
         console.error(`[Backend Socket: create-transfer] Error caught during transfer creation/save: ${error.message}`);
-        console.error(error); // Log full error object for more details
+        console.error(error);
         callback({ success: false, message: `Failed to create transfer: ${error.message}` });
         console.log(`[Backend Socket: create-transfer] Callback sent to frontend with error.`);
       }
@@ -93,7 +95,6 @@ const initSignalingService = (io: IoInstance) => {
 
         if (transfer) {
           console.log(`[Backend Socket: send-offer] Offer updated for code: ${data.shareCode}`);
-          // Emit to a specific room based on shareCode
           io.to(data.shareCode).emit('offer-received', { offer: data.offer, shareCode: data.shareCode, fileMetadata: transfer.fileMetadata });
           console.log(`[Backend Socket: send-offer] Emitted 'offer-received' to room ${data.shareCode}`);
         } else {
@@ -111,19 +112,16 @@ const initSignalingService = (io: IoInstance) => {
      * Emits 'candidate-received' to the other peer in the same transfer.
      */
     socket.on('send-candidate', async (data: { shareCode: string; candidate: any; isSender: boolean }) => {
-      // console.log(`[Backend Socket: send-candidate] Event received for code: ${data.shareCode} (isSender: ${data.isSender})`); // Too verbose
       try {
         const updateField = data.isSender ? 'senderCandidates' : 'receiverCandidates';
         const transfer = await Transfer.findOneAndUpdate(
           { shareCode: data.shareCode },
-          { $push: { [updateField]: data.candidate } }, // Push candidate to the array
+          { $push: { [updateField]: data.candidate } },
           { new: true }
         );
 
         if (transfer) {
-          // Emit the candidate to the other peer in the same room (shareCode)
           socket.to(data.shareCode).emit('candidate-received', { candidate: data.candidate, isSender: data.isSender });
-          // console.log(`[Backend Socket: send-candidate] Candidate ${data.isSender ? 'from sender' : 'from receiver'} for code ${data.shareCode} forwarded.`); // Too verbose
         } else {
           console.warn(`[Backend Socket: send-candidate] Transfer not found for candidate: ${data.shareCode}`);
         }
@@ -142,14 +140,15 @@ const initSignalingService = (io: IoInstance) => {
      */
     socket.on('join-transfer', async (data: { shareCode: string; receiverId: string }, callback: (response: { success: boolean; transfer?: any; message?: string }) => void) => {
       console.log(`[Backend Socket: join-transfer] Event received from ${socket.id} for code: ${data.shareCode}`);
-      socket.join(data.shareCode); // Join the Socket.IO room
+      socket.join(data.shareCode);
       console.log(`[Backend Socket: join-transfer] Socket ${socket.id} joined room ${data.shareCode} as receiver ${data.receiverId}`);
 
       try {
-        console.log(`[Backend Socket: join-transfer] Searching for transfer with code: ${data.shareCode}`);
+        console.log(`[Backend Socket: join-transfer] Searching for transfer with code: ${data.shareCode} in 'connecting' or 'active' status.`);
+        // Allow finding transfer if it's already in 'active' state
         const transfer = await Transfer.findOneAndUpdate(
-          { shareCode: data.shareCode, status: 'connecting' }, // Find transfer in connecting state
-          { receiverId: data.receiverId, status: 'active' }, // Set receiver ID and status to active
+          { shareCode: data.shareCode, status: { $in: ['connecting', 'active'] } }, // Allow 'connecting' or 'active'
+          { receiverId: data.receiverId, status: 'active' }, // Ensure status is active
           { new: true }
         );
 
@@ -157,19 +156,18 @@ const initSignalingService = (io: IoInstance) => {
           console.log(`[Backend Socket: join-transfer] Transfer found and updated for code: ${data.shareCode}`);
           callback({ success: true, transfer: {
             shareCode: transfer.shareCode,
-            offer: transfer.offer ,
+            offer: transfer.offer, // Send raw string from DB
             fileMetadata: transfer.fileMetadata,
             senderCandidates: transfer.senderCandidates,
-            receiverCandidates: transfer.receiverCandidates // Send existing candidates to new receiver
+            receiverCandidates: transfer.receiverCandidates
           }});
           console.log(`[Backend Socket: join-transfer] Callback sent to frontend with transfer data.`);
-          // Notify sender that a receiver has joined and get ready to send offer
           io.to(transfer.shareCode).emit('receiver-joined', { shareCode: transfer.shareCode });
           console.log(`[Backend Socket: join-transfer] Emitted 'receiver-joined' to room ${transfer.shareCode}`);
         } else {
-          console.warn(`[Backend Socket: join-transfer] Transfer not found or not in 'connecting' status for code: ${data.shareCode}`);
+          console.warn(`[Backend Socket: join-transfer] Transfer not found or not in 'connecting'/'active' status for code: ${data.shareCode}`);
           callback({ success: false, message: 'Transfer not found or offer not ready.' });
-          socket.leave(data.shareCode); // Leave room if transfer not found/ready
+          socket.leave(data.shareCode);
           console.log(`[Backend Socket: join-transfer] Callback sent to frontend with error (transfer not found).`);
         }
       } catch (error: any) {
@@ -196,7 +194,6 @@ const initSignalingService = (io: IoInstance) => {
 
         if (transfer) {
           console.log(`[Backend Socket: send-answer] Answer updated for code: ${data.shareCode}`);
-          // Emit the answer to the sender (who is also in the shareCode room)
           io.to(data.shareCode).emit('answer-received', { answer: data.answer, shareCode: data.shareCode });
           console.log(`[Backend Socket: send-answer] Emitted 'answer-received' to room ${data.shareCode}`);
         } else {
@@ -217,9 +214,7 @@ const initSignalingService = (io: IoInstance) => {
       try {
         await Transfer.findOneAndUpdate({ shareCode: data.shareCode }, { status: 'completed' });
         console.log(`[Backend Socket: transfer-completed] Transfer ${data.shareCode} marked as completed.`);
-        // Optionally, notify the other peer if they are still connected
         socket.to(data.shareCode).emit('transfer-finalized', { shareCode: data.shareCode, status: 'completed' });
-        // After completion, all sockets in this room can leave
         io.in(data.shareCode).socketsLeave(data.shareCode);
         console.log(`[Backend Socket: transfer-completed] Sockets left room ${data.shareCode}`);
       } catch (error: any) {
@@ -231,8 +226,6 @@ const initSignalingService = (io: IoInstance) => {
     // --- Disconnection Handling ---
     socket.on('disconnect', () => {
       console.log(`[Backend Socket] Disconnected: ${socket.id}`);
-      // Consider logic to clean up transfers if a sender/receiver disconnects prematurely.
-      // This can be complex, often handled by a separate cleanup service or heartbeat.
     });
   });
 };

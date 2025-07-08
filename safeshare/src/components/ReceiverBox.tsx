@@ -1,9 +1,9 @@
 // components/ReceiverBox.tsx
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 
-// Define the FileMetadata interface
+// Define the FileMetadata interface (can be moved to a shared types file if project grows)
 interface FileMetadata {
   name: string;
   size: number;
@@ -15,21 +15,33 @@ interface ReceiverBoxProps {
   enteredCode: string; // Real entered code from parent
   setEnteredCode: (code: string) => void; // Callback to update entered code in parent
   receivedFileMetadata: FileMetadata | null; // Real metadata received from parent
-  onStartReceiving: (code: string) => void; 
+  onStartReceiving: (code: string) => void; // Callback to initiate real receiving
+  isJoining: boolean; // Prop to indicate if a join request is in progress (from parent's useState)
 }
 
+/**
+ * Component for the file receiving interface, now integrated with real file data
+ * and callbacks for actual WebRTC signaling initiation.
+ */
 export default function ReceiverBox({
   connectionStatus,
   enteredCode,
   setEnteredCode,
-  receivedFileMetadata, // Now directly used from props
+  receivedFileMetadata,
   onStartReceiving,
+  isJoining,
 }: ReceiverBoxProps) {
 
   // Handles changes in the share code input field
   const handleCodeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setEnteredCode(event.target.value.toUpperCase()); // Update the entered code in the parent's state
   };
+
+  // The button's click handler directly calls the prop
+  const handleButtonClick = useCallback(() => {
+    onStartReceiving(enteredCode);
+  }, [enteredCode, onStartReceiving]);
+
 
   return (
     <div className="bg-gray-800 p-8 rounded-xl shadow-2xl w-full md:w-1/2 border border-teal-700 flex flex-col justify-between">
@@ -51,8 +63,9 @@ export default function ReceiverBox({
           </div>
         )}
         <button
-          onClick={() => onStartReceiving(enteredCode)} // Call parent's real start receiving function
-        //   disabled={!enteredCode || connectionStatus.includes('Connecting') || connectionStatus.includes('Transferring') || connectionStatus.includes('Waiting')}
+          onClick={handleButtonClick} // Direct call to prop
+          // Disable button based on parent's isJoining state and other conditions
+          disabled={!enteredCode || isJoining || connectionStatus.includes('Connecting') || connectionStatus.includes('Transferring') || connectionStatus.includes('Waiting')}
           className="w-full bg-gradient-to-r from-teal-600 to-green-700 hover:from-teal-700 hover:to-green-800 text-white font-bold py-4 px-6 rounded-lg shadow-lg transition duration-300 ease-in-out transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Connect & Download

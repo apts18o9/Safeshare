@@ -1,7 +1,17 @@
-
+'use client'
 import SharePanel from "@/components/SharePanel";
-
+import { useEffect } from "react";
 export default function Home() {
+
+
+  useEffect(() => {
+    console.log('[Home/page.tsx] Component Mounted');
+    return () => {
+      console.log('[Home/page.tsx] Component Unmounted');
+    };
+  }, []);
+
+  console.log('[Home/page.tsx] Component Rendered');
 
   return (
     <div>
@@ -17,6 +27,6 @@ export default function Home() {
 
       <SharePanel />
     </div>
-    
+
   );
 }
